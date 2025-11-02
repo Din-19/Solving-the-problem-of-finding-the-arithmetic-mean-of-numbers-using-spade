@@ -1,0 +1,1 @@
+# Solving-the-problem-of-finding-the-arithmetic-mean-of-numbers-using-spade
