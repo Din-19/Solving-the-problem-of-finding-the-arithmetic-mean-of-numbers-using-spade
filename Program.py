@@ -82,6 +82,11 @@ async def main():
         for i in range(NUM_AGENTS)
     }
 
+    # --- Счётчики затрат ---
+    total_messages = 0      # каждое сообщение = 0.1 руб
+    total_arith_ops = 0     # каждое + или / = 0.01 руб
+    iterations_done = 0
+
     for iteration in range(MAX_ITER):
         for box in message_boxes.values():
             box.clear()
@@ -92,6 +97,7 @@ async def main():
                 msg.body = str(current_values[jid])
                 sender = next(a for a in agents if str(a.jid).split("/")[0] == jid)
                 await sender.send(msg)
+                total_messages += 1
 
         new_values = {}
         max_diff = 0.0
@@ -104,18 +110,23 @@ async def main():
                     break
                 try:
                     received.append(float(msg.body))
+                    total_arith_ops += 1  
                 except ValueError:
                     continue
 
             all_vals = [current_values[jid]] + received
-            new_val = sum(all_vals) / len(all_vals)
+            num_vals = len(all_vals)
+            total_arith_ops += (num_vals - 1) + 1
+
+            new_val = sum(all_vals) / num_vals
             new_values[jid] = new_val
             max_diff = max(max_diff, abs(new_val - current_values[jid]))
 
         current_values = new_values
+        iterations_done += 1
 
         if max_diff < TARGET_PRECISION:
-            print(f"Общее среднее найдено на итерации {iteration + 1}!")
+            print(f"Общее среднее найдено на итерации {iterations_done}!")
             break
     else:
         print("Достигнут лимит итераций — возможно, сеть слишком разрежена.")
@@ -124,6 +135,27 @@ async def main():
     print(f"\nРезультат: {final_val:.6f}")
     print(f"Истинное среднее:     {true_mean:.6f}")
     print(f"Ошибка:               {abs(final_val - true_mean):.2e}")
+
+    # --- Расчёт стоимости ---
+    memory_cost = NUM_AGENTS * 1.0                    # 10 чисел × 1 руб
+    iteration_cost = iterations_done * 1.0            # по 1 руб за итерацию
+    arith_cost = total_arith_ops * 0.01               # 0.01 руб за операцию
+    message_cost = total_messages * 0.1               # 0.1 руб за сообщение
+    final_report_cost = 1000.0                        # отправка финального результата
+
+    total_cost = memory_cost + iteration_cost + arith_cost + message_cost + final_report_cost
+
+    print("\n" + "="*50)
+    print("РАСЧЁТ СТОИМОСТИ ВЫПОЛНЕНИЯ")
+    print("="*50)
+    print(f"Хранение {NUM_AGENTS} чисел:        {memory_cost:>10.2f} руб")
+    print(f"Итераций: {iterations_done} × 1 руб = {iteration_cost:>10.2f} руб")
+    print(f"Арифметических операций: {total_arith_ops} × 0.01 руб = {arith_cost:>7.2f} руб")
+    print(f"Сообщений: {total_messages} × 0.1 руб = {message_cost:>9.2f} руб")
+    print(f"Отправка финального результата:   {final_report_cost:>10.2f} руб")
+    print("-"*50)
+    print(f"ИТОГО:                            {total_cost:>10.2f} руб")
+    print("="*50)
 
 
 if __name__ == "__main__":
